@@ -1,11 +1,9 @@
 const { createHandler } = require('@app-core/server');
 const axios = require('axios');
 
-// Helper function to parse reqline without regex
 function parseReqline(reqline) {
   const parts = reqline.split(' | ');
 
-  // Validate basic structure
   if (parts.length < 2) {
     throw new Error('Invalid reqline format. Expected at least HTTP and URL parts.');
   }
@@ -18,12 +16,10 @@ function parseReqline(reqline) {
     body: {},
   };
 
-  // Parse each part
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i].trim();
 
     if (i === 0) {
-      // First part should be HTTP method
       if (!part.startsWith('HTTP ')) {
         throw new Error('Missing required HTTP keyword');
       }
@@ -39,7 +35,6 @@ function parseReqline(reqline) {
 
       result.method = methodPart;
     } else if (i === 1) {
-      // Second part should be URL
       if (!part.startsWith('URL ')) {
         throw new Error('Missing required URL keyword');
       }
@@ -47,6 +42,15 @@ function parseReqline(reqline) {
       const urlPart = part.substring(4).trim();
       if (!urlPart) {
         throw new Error('Missing URL value');
+      }
+
+      if (!urlPart.startsWith('http://') && !urlPart.startsWith('https://')) {
+        throw new Error('Invalid URL format. Must start with http:// or https://');
+      }
+
+      const urlParts = urlPart.split('/');
+      if (urlParts.length < 3) {
+        throw new Error('Invalid URL format. Missing domain or path');
       }
 
       result.url = urlPart;
@@ -83,7 +87,6 @@ function parseReqline(reqline) {
     }
   }
 
-  // Validate required parts
   if (!result.method) {
     throw new Error('Missing required HTTP keyword');
   }
@@ -95,7 +98,7 @@ function parseReqline(reqline) {
   return result;
 }
 
-// Helper function to build full URL with query parameters
+// Build full URL with query parameters
 function buildFullUrl(baseUrl, queryParams) {
   if (!queryParams || Object.keys(queryParams).length === 0) {
     return baseUrl;
@@ -126,26 +129,21 @@ module.exports = createHandler({
         };
       }
 
-      // Parse the reqline
       const parsed = parseReqline(reqline);
 
-      // Build full URL
       const fullUrl = buildFullUrl(parsed.url, parsed.query);
 
-      // Prepare request config
       const requestConfig = {
         method: parsed.method.toLowerCase(),
         url: fullUrl,
         headers: parsed.headers,
-        timeout: 10000, // 10 second timeout
+        timeout: 10000,
       };
 
-      // Add body for POST requests
       if (parsed.method === 'POST' && Object.keys(parsed.body).length > 0) {
         requestConfig.data = parsed.body;
       }
 
-      // Make the HTTP request
       const requestStartTimestamp = Date.now();
       const response = await axios(requestConfig);
       const requestStopTimestamp = Date.now();
@@ -171,7 +169,6 @@ module.exports = createHandler({
         },
       };
     } catch (error) {
-      // Handle parsing errors
       if (
         error.message.includes('Invalid reqline format') ||
         error.message.includes('Missing required') ||
@@ -188,7 +185,6 @@ module.exports = createHandler({
         };
       }
 
-      // Handle HTTP request errors
       if (error.response) {
         return {
           status: helpers.http_statuses.HTTP_400_BAD_REQUEST,
@@ -199,7 +195,6 @@ module.exports = createHandler({
         };
       }
 
-      // Handle network errors
       return {
         status: helpers.http_statuses.HTTP_400_BAD_REQUEST,
         data: {
